@@ -3987,6 +3987,7 @@ BEGIN;
                     FROM sys.dm_exec_cursors(@in_session_id) AS c
                     WHERE
                         c.is_open = 1
+                        AND c.properties LIKE ''API%''
                     ORDER BY
                         c.cursor_id DESC'
                 WHEN OBJECT_ID('sys.dm_db_exec_cursors') IS NOT NULL THEN N'
@@ -3996,6 +3997,7 @@ BEGIN;
                     FROM sys.dm_db_exec_cursors(@in_session_id) AS c
                     WHERE
                         c.is_open = 1
+                        AND c.properties LIKE ''API%''
                     ORDER BY
                         c.cursor_id DESC'
             END,
