@@ -1381,15 +1381,6 @@ BEGIN;
         DECLARE @sys_info BIT;
         SET @sys_info = ISNULL(CONVERT(BIT, SIGN(OBJECT_ID('sys.dm_os_sys_info'))), 0);
 
-        DECLARE @cursor_dmv VARCHAR(128);
-        SET @cursor_dmv =
-            CASE
-                WHEN OBJECT_ID('sys.dm_exec_cursors') IS NOT NULL
-                    THEN 'sys.dm_exec_cursors'
-                WHEN OBJECT_ID('sys.dm_db_exec_cursors') IS NOT NULL
-                    THEN 'sys.dm_db_exec_cursors'
-            END;
-
         --Used for the delta pull
         REDO:;
 
@@ -3987,23 +3978,29 @@ BEGIN;
             @database_name sysname;
 
         --Variables for API cursor enrichment
-        DECLARE
-            @cursor_fetch_sql NVARCHAR(MAX),
+        DECLARE @cursor_fetch_sql NVARCHAR(MAX) =
+            CASE
+                WHEN OBJECT_ID('sys.dm_exec_cursors') IS NOT NULL THEN N'
+                    SELECT TOP(1)
+                        @out_handle = c.sql_handle,
+                        @out_plan_generation_num = c.plan_generation_num
+                    FROM sys.dm_exec_cursors(@in_session_id) AS c
+                    WHERE
+                        c.is_open = 1
+                    ORDER BY
+                        c.cursor_id DESC'
+                WHEN OBJECT_ID('sys.dm_db_exec_cursors') IS NOT NULL THEN N'
+                    SELECT TOP(1)
+                        @out_handle = c.sql_handle,
+                        @out_plan_generation_num = c.plan_generation_num
+                    FROM sys.dm_db_exec_cursors(@in_session_id) AS c
+                    WHERE
+                        c.is_open = 1
+                    ORDER BY
+                        c.cursor_id DESC'
+            END,
             @cursor_sql_handle VARBINARY(64),
             @cursor_plan_generation_num INT;
-
-        IF @cursor_dmv IS NOT NULL
-        BEGIN;
-            SET @cursor_fetch_sql = N'
-                SELECT TOP(1)
-                    @out_handle = c.sql_handle,
-                    @out_plan_generation_num = c.plan_generation_num
-                FROM ' + @cursor_dmv + N'(@in_session_id) AS c
-                WHERE
-                    c.is_open = 1
-                ORDER BY
-                    c.cursor_id DESC';
-        END;
 
         IF
             @recursion = 1
